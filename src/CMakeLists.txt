@@ -1,3 +1,5 @@
+option(SLIM_BUILD "Enable slim build with reduced memory usage" OFF)
+
 set(HEADERS
         bindings/connection.h
         bindings/error.h
@@ -120,6 +122,8 @@ set(MAIN_LINK_OPTIONS
         -lembind
         $<$<BOOL:${ENABLE_WASMFS}>:-sWASMFS>
         $<$<BOOL:${ENABLE_MODULES}>:-sMAIN_MODULE=2>
+        $<$<BOOL:${ENABLE_FS}>:-sFORCE_FILESYSTEM=1>
+        $<$<NOT:$<BOOL:${ENABLE_FS}>>:-sFORCE_FILESYSTEM=0>
         $<$<BOOL:${ENABLE_MODULES}>:--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/modules-pre.js>
         --js-library=${CMAKE_CURRENT_SOURCE_DIR}/vips-library.js
         -sAUTOLOAD_DYLIBS=0
@@ -128,14 +132,15 @@ set(MAIN_LINK_OPTIONS
         -sMODULARIZE
         -sEXPORT_NAME='Vips'
         -sEXIT_RUNTIME
-        -sINITIAL_MEMORY=1GB
+        $<$<NOT:$<BOOL:${SLIM_BUILD}>>:-sINITIAL_MEMORY=1GB>
+        $<$<BOOL:${SLIM_BUILD}>:-sINITIAL_MEMORY=256MB>
         -sSTACK_SIZE=256KB
         -sALLOW_TABLE_GROWTH
         -sALLOW_BLOCKING_ON_MAIN_THREAD
         -sTEXTDECODER=2
         -sASSERTIONS=0
-        -sFORCE_FILESYSTEM
-        -sEXPORTED_RUNTIME_METHODS=FS,ENV,deletionQueue,addFunction,bigintToI53Checked
+        $<$<BOOL:${ENABLE_FS}>:-sEXPORTED_RUNTIME_METHODS=FS,ENV,deletionQueue,addFunction,bigintToI53Checked>
+        $<$<NOT:$<BOOL:${ENABLE_FS}>>:-sEXPORTED_RUNTIME_METHODS=ENV,deletionQueue,addFunction,bigintToI53Checked>
         -sEXCEPTION_STACK_TRACES
         -sBINARYEN_EXTRA_PASSES=--emit-target-features
         )
