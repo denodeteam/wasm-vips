@@ -33,23 +33,11 @@ This **fork** of [`wasm-vips`](https://github.com/kleisauke/wasm-vips) provides 
   - Supports only JPEG, PNG, and WebP loaders.
   - Filesystem (FS) support is not available
 
-- **`@denodecom/wasm-vips/lowmem`**: A build optimized for low memory usage with a maximum memory limit of 256MB to avoid out-of-memory (OOM) issues on iOS.
+- **`@denodecom/wasm-vips/lowmem`**: A low memory build with a maximum memory limit of 256MB to avoid out-of-memory (OOM) issues on iOS.
   - Supports all loaders.
 
 - **`@denodecom/wasm-vips/nosimd/lowmem`**: A low memory build without SIMD support, with a maximum memory limit of 256MB to avoid out-of-memory (OOM) issues on iOS.
   - Supports all loaders.
-
-
-
-### Low Memory Builds
-
-- **`./lowmem`**: A build optimized for low memory usage.
-  - **Browser**: `./lib/lowmem/vips-es6.js` (ES6 Module) or `./lib/lowmem/vips.js` (CommonJS Module)
-  - **Node.js**: `./lib/lowmem/vips-node.mjs` (ES6 Module) or `./lib/lowmem/vips-node.js` (CommonJS Module)
-
-- **`./nosimd/lowmem`**: A low memory build without SIMD support.
-  - **Browser**: `./lib/nosimd/lowmem/vips-es6.js` (ES6 Module) or `./lib/nosimd/lowmem/vips.js` (CommonJS Module)
-  - **Node.js**: `./lib/nosimd/lowmem/vips-node.mjs` (ES6 Module) or `./lib/nosimd/lowmem/vips-node.js` (CommonJS Module)
 
 
 ## Engine support for default build
