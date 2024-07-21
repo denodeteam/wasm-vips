@@ -566,6 +566,8 @@ node --version
   # Use a single wasm binary for web and Node.js
   for file in vips-es6.js vips-node.js vips-node-es6.mjs; do
     sed -i "s/${file%.*}.wasm/vips.wasm/g" $OUTPUT_DIR/$file
+    # fix <Circular worker imports detected. Vite does not support it> see: https://github.com/vitejs/vite/pull/16103
+    sed -i "s|new Worker(new URL(\"$file\",import.meta.url)|new Worker(new URL(import.meta.url)|" $OUTPUT_DIR/$file
   done
 
   # Omit -es6 suffix from Node.js files
