@@ -13,7 +13,7 @@ on:
 permissions: {}
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       cache-key: ${{ steps.gen-cache-key.outputs.key }}
     steps:
@@ -45,9 +45,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             nodejs_version: 16
-          - os: macos-12
+          - os: macos-13
             nodejs_version: 16
           - os: windows-2022
             nodejs_version: 16
@@ -78,12 +78,12 @@ jobs:
     permissions:
       contents: write # for gh release create
       id-token: write # for npm publish --provenance
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
       - uses: actions/cache/restore@v4
         with:

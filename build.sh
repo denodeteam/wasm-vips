@@ -37,6 +37,11 @@ FS=true
 # https://github.com/WebAssembly/exception-handling
 WASM_EH=false
 
+# Emit instructions for the standardized Wasm EH proposal with exnref
+# (adopted on Oct 2023), disabled by default
+# https://github.com/WebAssembly/exception-handling/issues/280
+WASM_EXNREF=false
+
 # Link-time optimizations (LTO), disabled by default
 # https://github.com/emscripten-core/emscripten/issues/10603
 LTO=false
@@ -82,6 +87,10 @@ while [ $# -gt 0 ]; do
     --enable-wasm-fs) WASM_FS=true ;;
     --enable-wasm-eh) WASM_EH=true ;;
     --disable-fs) FS=false ;;
+    --enable-new-wasm-eh)
+      WASM_EH=true
+      WASM_EXNREF=true
+      ;;
     --disable-simd) SIMD=false ;;
     --disable-wasm-bigint) WASM_BIGINT=false ;;
     --disable-jxl) JXL=false ;;
@@ -146,7 +155,7 @@ fi
 #export LDFLAGS+=" --source-map-base http://localhost:3000/lib/"
 
 # Rust flags
-export RUSTFLAGS="-Ctarget-feature=+atomics,+bulk-memory,+nontrapping-fptoint -Zdefault-hidden-visibility=yes"
+export RUSTFLAGS="-Ctarget-feature=+atomics,+bulk-memory,+nontrapping-fptoint -Zdefault-visibility=hidden"
 
 # Common compiler flags
 if [ $SLIM_BUILD = "true" ]; then
@@ -161,13 +170,13 @@ if [ "$LTO" = "true" ]; then
 fi
 if [ "$WASM_EH" = "true" ]; then
   COMMON_FLAGS+=" -fwasm-exceptions -sSUPPORT_LONGJMP=wasm"
-  # https://github.com/rust-lang/rust/issues/112195
-  export RUSTFLAGS+=" -Cllvm-args=-enable-emscripten-cxx-exceptions=0 -Cllvm-args=-wasm-enable-sjlj"
+  # https://github.com/rust-lang/rust/pull/131830
+  export RUSTFLAGS+=" -Zemscripten-wasm-eh"
 else
   COMMON_FLAGS+=" -fexceptions"
 fi
 
-export CFLAGS="$COMMON_FLAGS -mnontrapping-fptoint -fvisibility=hidden"
+export CFLAGS="$COMMON_FLAGS -fvisibility=hidden"
 if [ "$SIMD" = "true" ]; then
   export CFLAGS+=" -msimd128 -DWASM_SIMD_COMPAT_SLOW"
   export RUSTFLAGS+=" -Ctarget-feature=+simd128"
@@ -177,9 +186,8 @@ if [ "$PIC" = "true" ]; then export CFLAGS+=" -fPIC"; fi
 export CXXFLAGS="$CFLAGS"
 
 export LDFLAGS="$COMMON_FLAGS -L$TARGET/lib -sAUTO_JS_LIBRARIES=0 -sAUTO_NATIVE_LIBRARIES=0"
-if [ "$WASM_BIGINT" = "true" ]; then export LDFLAGS+=" -sWASM_BIGINT"; fi
-# FIXME(kleisauke): Workaround for: https://github.com/emscripten-core/emscripten/issues/16836#issuecomment-1556187350
-if [ "$LTO" = "true" ]; then export LDFLAGS+=" -Wl,-u,htonl"; fi
+if [ "$WASM_BIGINT" = "false" ]; then export LDFLAGS+=" -sWASM_BIGINT=0"; fi
+if [ "$WASM_EXNREF" = "true" ]; then export LDFLAGS+=" -sWASM_LEGACY_EXCEPTIONS=0"; fi
 
 # Build paths
 export CPATH="$TARGET/include"
@@ -188,7 +196,14 @@ export EM_PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
 
 # Specific variables for cross-compilation
 export CHOST="wasm32-unknown-linux" # wasm32-unknown-emscripten
-export MESON_CROSS="$SOURCE_DIR/build/emscripten-crossfile.meson"
+export CMAKE_ARGS=""
+export MESON_ARGS="--cross-file=$SOURCE_DIR/build/emscripten-cross.ini"
+if [ "$WASM_EXNREF" = "true" ]; then
+  # Requires Node >= 22
+  # https://github.com/nodejs/node/pull/51362
+  export CMAKE_ARGS+=" -DCMAKE_CROSSCOMPILING_EMULATOR=node;--experimental-wasm-exnref"
+  export MESON_ARGS+=" --cross-file=$SOURCE_DIR/build/node-wasm-exnref.ini"
+fi
 
 # Run as many parallel jobs as there are available CPU cores
 export MAKEFLAGS="-j$(nproc)"
@@ -204,25 +219,25 @@ export RUSTFLAGS+=" --remap-path-prefix=$CARGO_HOME/registry/src/="
 export RUSTFLAGS+=" --remap-path-prefix=$DEPS/="
 
 # Dependency version numbers
-VERSION_ZLIB_NG=2.2.1       # https://github.com/zlib-ng/zlib-ng
+VERSION_ZLIB_NG=2.2.3       # https://github.com/zlib-ng/zlib-ng
 VERSION_FFI=3.4.6           # https://github.com/libffi/libffi
-VERSION_GLIB=2.81.0         # https://gitlab.gnome.org/GNOME/glib
-VERSION_EXPAT=2.6.2         # https://github.com/libexpat/libexpat
+VERSION_GLIB=2.83.2         # https://gitlab.gnome.org/GNOME/glib
+VERSION_EXPAT=2.6.4         # https://github.com/libexpat/libexpat
 VERSION_EXIF=0.6.24         # https://github.com/libexif/libexif
 VERSION_LCMS2=2.16          # https://github.com/mm2/Little-CMS
 VERSION_HWY=1.2.0           # https://github.com/google/highway
 VERSION_BROTLI=1.1.0        # https://github.com/google/brotli
 VERSION_MOZJPEG=4.1.5       # https://github.com/mozilla/mozjpeg
-VERSION_JXL=0.10.3          # https://github.com/libjxl/libjxl
+VERSION_JXL=0.11.1          # https://github.com/libjxl/libjxl
 VERSION_SPNG=0.7.4          # https://github.com/randy408/libspng
 VERSION_IMAGEQUANT=2.4.1    # https://github.com/lovell/libimagequant
 VERSION_CGIF=0.4.1          # https://github.com/dloebl/cgif
-VERSION_WEBP=1.4.0          # https://chromium.googlesource.com/webm/libwebp
-VERSION_TIFF=4.6.0          # https://gitlab.com/libtiff/libtiff
-VERSION_RESVG=0.42.0        # https://github.com/RazrFalcon/resvg
-VERSION_AOM=3.9.1           # https://aomedia.googlesource.com/aom
-VERSION_HEIF=1.18.0         # https://github.com/strukturag/libheif
-VERSION_VIPS=8.15.2         # https://github.com/libvips/libvips
+VERSION_WEBP=1.5.0          # https://chromium.googlesource.com/webm/libwebp
+VERSION_TIFF=4.7.0          # https://gitlab.com/libtiff/libtiff
+VERSION_RESVG=0.44.0        # https://github.com/linebender/resvg
+VERSION_AOM=3.11.0          # https://aomedia.googlesource.com/aom
+VERSION_HEIF=1.19.5         # https://github.com/strukturag/libheif
+VERSION_VIPS=8.16.0         # https://github.com/libvips/libvips
 
 VERSION_EMSCRIPTEN="$(emcc -dumpversion)"
 
@@ -283,7 +298,7 @@ node --version
   cd $DEPS/zlib-ng
   # SSE intrinsics needs to be checked for wasm32
   sed -i 's/BASEARCH_X86_FOUND/& OR BASEARCH_WASM32_FOUND/g' CMakeLists.txt
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DBUILD_SHARED_LIBS=FALSE \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DBUILD_SHARED_LIBS=FALSE \
     ${DISABLE_SIMD:+-DWITH_OPTIM=FALSE} ${ENABLE_SIMD:+-DFORCE_SSE2=TRUE} -DWITH_RUNTIME_CPU_DETECTION=FALSE -DZLIB_COMPAT=TRUE \
     -DZLIB_ENABLE_TESTS=FALSE -DZLIBNG_ENABLE_TESTS=FALSE -DWITH_GTEST=FALSE
   make -C _build install
@@ -310,9 +325,9 @@ node --version
   cd $DEPS/glib
   # TODO(kleisauke): Discuss these patches upstream
   curl -Ls https://github.com/GNOME/glib/compare/$VERSION_GLIB...kleisauke:wasm-vips-$VERSION_GLIB.patch | patch -p1
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
     --force-fallback-for=gvdb -Dintrospection=disabled -Dselinux=disabled -Dxattr=false -Dlibmount=disabled -Dsysprof=disabled -Dnls=disabled \
-    -Dtests=false -Dglib_assert=false -Dglib_checks=false
+    -Dglib_debug=disabled -Dtests=false -Dglib_assert=false -Dglib_checks=false
   meson install -C _build --tag devel
 )
 
@@ -331,6 +346,10 @@ node --version
   mkdir $DEPS/exif
   curl -Ls https://github.com/libexif/libexif/releases/download/v$VERSION_EXIF/libexif-$VERSION_EXIF.tar.bz2 | tar xjC $DEPS/exif --strip-components=1
   cd $DEPS/exif
+  # https://github.com/libexif/libexif/pull/147
+  curl -Ls https://github.com/libexif/libexif/commit/00ee559ac8293c6ab9b0b4d26d3650ec89d2b1fc.patch | patch -p1
+  # https://github.com/libexif/libexif/pull/183
+  curl -Ls https://github.com/libexif/libexif/commit/180c1201dc494a06335b3b42bce5d4e07e6ae38c.patch | patch -p1
   emconfigure ./configure --host=$CHOST --prefix=$TARGET --enable-static --disable-shared --disable-dependency-tracking \
     --disable-docs --disable-nls --without-libiconv-prefix --without-libintl-prefix CPPFLAGS="-DNO_VERBOSE_TAG_DATA"
   make install doc_DATA=
@@ -341,7 +360,7 @@ node --version
   mkdir $DEPS/lcms2
   curl -Ls https://github.com/mm2/Little-CMS/releases/download/lcms$VERSION_LCMS2/lcms2-$VERSION_LCMS2.tar.gz | tar xzC $DEPS/lcms2 --strip-components=1
   cd $DEPS/lcms2
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
     -Djpeg=disabled -Dtiff=disabled
   meson install -C _build --tag devel
 )
@@ -353,7 +372,7 @@ node --version
   cd $DEPS/hwy
   # Remove build path from binary
   sed -i 's/HWY_ASSERT/HWY_DASSERT/' hwy/aligned_allocator.cc
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DBUILD_SHARED_LIBS=FALSE \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DBUILD_SHARED_LIBS=FALSE \
     -DBUILD_TESTING=FALSE -DHWY_ENABLE_CONTRIB=FALSE -DHWY_ENABLE_EXAMPLES=FALSE -DHWY_ENABLE_TESTS=FALSE
   make -C _build install
 )
@@ -364,7 +383,7 @@ node --version
   curl -Ls https://github.com/google/brotli/archive/refs/tags/v$VERSION_BROTLI.tar.gz | tar xzC $DEPS/brotli --strip-components=1
   cd $DEPS/brotli
   # Exclude internal dictionary, see: https://github.com/emscripten-core/emscripten/issues/9960
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DBROTLI_DISABLE_TESTS=TRUE \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DBROTLI_DISABLE_TESTS=TRUE \
     -DCMAKE_C_FLAGS="$CFLAGS -DBROTLI_EXTERNAL_DICTIONARY_DATA"
   make -C _build install
 )
@@ -374,9 +393,11 @@ node --version
   mkdir $DEPS/jpeg
   curl -Ls https://github.com/mozilla/mozjpeg/archive/refs/tags/v$VERSION_MOZJPEG.tar.gz | tar xzC $DEPS/jpeg --strip-components=1
   cd $DEPS/jpeg
+  # TODO(kleisauke): Discuss this patch upstream
+  curl -Ls https://github.com/kleisauke/libjpeg-turbo/commit/a60fb467fc7601b008741d42e98268c8a7bcb5b4.patch | patch -p1
   # Compile without SIMD support, see: https://github.com/libjpeg-turbo/libjpeg-turbo/issues/250
   # Disable environment variables usage, see: https://github.com/libjpeg-turbo/libjpeg-turbo/issues/600
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DENABLE_STATIC=TRUE \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DENABLE_STATIC=TRUE \
     -DENABLE_SHARED=FALSE -DWITH_JPEG8=TRUE -DWITH_SIMD=FALSE -DWITH_TURBOJPEG=FALSE -DPNG_SUPPORTED=FALSE \
     -DCMAKE_C_FLAGS="$CFLAGS -DNO_GETENV -DNO_PUTENV"
   make -C _build install
@@ -387,11 +408,10 @@ node --version
   mkdir $DEPS/jxl
   curl -Ls https://github.com/libjxl/libjxl/archive/refs/tags/v$VERSION_JXL.tar.gz | tar xzC $DEPS/jxl --strip-components=1
   cd $DEPS/jxl
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DCMAKE_FIND_ROOT_PATH=$TARGET \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DCMAKE_FIND_ROOT_PATH=$TARGET \
     -DBUILD_SHARED_LIBS=FALSE -DBUILD_TESTING=FALSE -DJPEGXL_ENABLE_TOOLS=FALSE -DJPEGXL_ENABLE_JPEGLI=FALSE \
     -DJPEGXL_ENABLE_EXAMPLES=FALSE -DJPEGXL_ENABLE_SJPEG=FALSE -DJPEGXL_ENABLE_SKCMS=FALSE -DJPEGXL_BUNDLE_LIBPNG=FALSE \
     -DJPEGXL_FORCE_SYSTEM_BROTLI=TRUE -DJPEGXL_FORCE_SYSTEM_LCMS2=TRUE -DJPEGXL_FORCE_SYSTEM_HWY=TRUE \
-    -DCMAKE_C_FLAGS="$CFLAGS -DJXL_DEBUG_ON_ABORT=0" -DCMAKE_CXX_FLAGS="$CXXFLAGS -DJXL_DEBUG_ON_ABORT=0" \
     -DJPEGXL_ENABLE_TRANSCODE_JPEG=FALSE # libvips always decodes to pixels
   make -C _build install
   if [ -n "$ENABLE_MODULES" ]; then
@@ -414,7 +434,7 @@ node --version
   curl -Ls https://github.com/randy408/libspng/compare/v$VERSION_SPNG...kleisauke:wasm-vips.patch | patch -p1
   # Switch the default zlib compression strategy to Z_RLE, as this is especially suitable for PNG images
   sed -i 's/Z_FILTERED/Z_RLE/g' spng/spng.c
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
     -Dbuild_examples=false -Dstatic_zlib=true ${DISABLE_SIMD:+-Denable_opt=false} ${ENABLE_SIMD:+-Dc_args="$CFLAGS -msse4.1 -DSPNG_SSE=4"}
   meson install -C _build --tag devel
 )
@@ -424,7 +444,7 @@ node --version
   mkdir $DEPS/imagequant
   curl -Ls https://github.com/lovell/libimagequant/archive/refs/tags/v$VERSION_IMAGEQUANT.tar.gz | tar xzC $DEPS/imagequant --strip-components=1
   cd $DEPS/imagequant
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
     ${ENABLE_SIMD:+-Dc_args="$CFLAGS -msse -DUSE_SSE=1"}
   meson install -C _build --tag devel
 )
@@ -434,8 +454,8 @@ node --version
   mkdir $DEPS/cgif
   curl -Ls https://github.com/dloebl/cgif/archive/refs/tags/v$VERSION_CGIF.tar.gz | tar xzC $DEPS/cgif --strip-components=1
   cd $DEPS/cgif
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
-    -Dtests=false
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
+    -Dexamples=false -Dtests=false
   meson install -C _build --tag devel
 )
 
@@ -468,11 +488,14 @@ node --version
 [ -f "$TARGET/lib/libresvg.a" ] || [ -n "$DISABLE_SVG" ] || (
   stage "Compiling resvg"
   mkdir -p $DEPS/resvg
-  curl -Ls https://github.com/RazrFalcon/resvg/releases/download/v$VERSION_RESVG/resvg-$VERSION_RESVG.tar.xz | tar xJC $DEPS/resvg --strip-components=1
+  curl -Ls https://github.com/linebender/resvg/releases/download/v$VERSION_RESVG/resvg-$VERSION_RESVG.tar.xz | tar xJC $DEPS/resvg --strip-components=1
   cd $DEPS/resvg
   # Vendor dir doesn't work with -Zbuild-std due to https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   # Just delete the config so that all deps are downloaded from the internet
   rm .cargo/config
+  # Update and regenerate the lockfile for zune-jpeg
+  # https://github.com/etemesi254/zune-image/pull/242
+  cargo update zune-jpeg
   # We don't want to build the shared library
   sed -i '/^crate-type =/s/"cdylib", //' crates/c-api/Cargo.toml
   cargo build --manifest-path=crates/c-api/Cargo.toml --release --target wasm32-unknown-emscripten --locked \
@@ -486,7 +509,7 @@ node --version
   mkdir $DEPS/aom
   curl -Ls https://storage.googleapis.com/aom-releases/libaom-$VERSION_AOM.tar.gz | tar xzC $DEPS/aom --strip-components=1
   cd $DEPS/aom
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS \
     -DAOM_TARGET_CPU=generic ${ENABLE_PIC:+-DCONFIG_PIC=1} -DCONFIG_RUNTIME_CPU_DETECT=0 \
     -DENABLE_DOCS=FALSE -DENABLE_TESTS=FALSE -DENABLE_EXAMPLES=FALSE -DENABLE_TOOLS=FALSE \
     -DCONFIG_WEBM_IO=0 -DCONFIG_AV1_HIGHBITDEPTH=0 \
@@ -501,9 +524,9 @@ node --version
   cd $DEPS/heif
   # Note: without CMAKE_FIND_ROOT_PATH find_path for AOM is not working for some reason (see https://github.com/emscripten-core/emscripten/issues/10078).
   # Compile with -D__EMSCRIPTEN_STANDALONE_WASM__ to disable the Embind implementation.
-  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET -DCMAKE_FIND_ROOT_PATH=$TARGET \
+  emcmake cmake -B_build -H. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$TARGET $CMAKE_ARGS -DCMAKE_FIND_ROOT_PATH=$TARGET \
     -DBUILD_SHARED_LIBS=FALSE -DCMAKE_POSITION_INDEPENDENT_CODE=$PIC -DENABLE_PLUGIN_LOADING=FALSE \
-    -DBUILD_TESTING=FALSE -DWITH_EXAMPLES=FALSE -DWITH_LIBDE265=FALSE -DWITH_X265=FALSE \
+    -DBUILD_TESTING=FALSE -DWITH_EXAMPLES=FALSE -DWITH_LIBDE265=FALSE -DWITH_X265=FALSE -DWITH_OpenH264_DECODER=FALSE \
     -DCMAKE_CXX_FLAGS="$CXXFLAGS -D__EMSCRIPTEN_STANDALONE_WASM__" \
     -DENABLE_MULTITHREADING_SUPPORT=FALSE # Disable threading support, we rely on libvips' thread pool.
   make -C _build install
@@ -519,18 +542,16 @@ node --version
 [ -f "$TARGET/lib/pkgconfig/vips.pc" ] || (
   stage "Compiling vips"
   mkdir $DEPS/vips
-  curl -Ls https://github.com/libvips/libvips/releases/download/v$VERSION_VIPS/vips-$(without_prerelease $VERSION_VIPS).tar.xz | tar xJC $DEPS/vips --strip-components=1
+  curl -Ls https://github.com/libvips/libvips/releases/download/v$VERSION_VIPS/vips-$VERSION_VIPS.tar.xz | tar xJC $DEPS/vips --strip-components=1
   cd $DEPS/vips
   # Emscripten specific patches
-  curl -Ls https://github.com/libvips/libvips/compare/v$VERSION_VIPS...kleisauke:wasm-vips-8.15.patch | patch -p1
-  # Disable HBR support in heifsave
-  curl -Ls https://github.com/kleisauke/libvips/commit/ad921cf9396dc5a224e93c71b601e87bd3a8a521.patch | patch -p1
+  curl -Ls https://github.com/libvips/libvips/compare/v$VERSION_VIPS...kleisauke:wasm-vips-8.16.patch | patch -p1
   # Disable building man pages, gettext po files, tools, and (fuzz-)tests
   sed -i "/subdir('man')/{N;N;N;N;d;}" meson.build
-  meson setup _build --prefix=$TARGET --cross-file=$MESON_CROSS --default-library=static --buildtype=release \
+  meson setup _build --prefix=$TARGET $MESON_ARGS --default-library=static --buildtype=release \
     -Ddeprecated=false -Dexamples=false -Dcplusplus=$LIBVIPS_CPP -Dauto_features=disabled \
     -Dexif=enabled -Dimagequant=enabled -Djpeg=enabled -Dwebp=enabled -Dspng=enabled -Dlcms=enabled -Dzlib=enabled \
-    ${ENABLE_MODULES:+-Dmodules=enabled} ${ENABLE_GIF:+-Dcgif=enabled} ${ENABLE_TIFF:+-Dtiff=enabled} \
+    ${DISABLE_MODULES:+-Dmodules=disabled} ${ENABLE_GIF:+-Dcgif=enabled} ${ENABLE_TIFF:+-Dtiff=enabled} \
     ${ENABLE_JXL:+-Djpeg-xl=enabled -Djpeg-xl-module=enabled} ${ENABLE_AVIF:+-Dheif=enabled -Dheif-module=enabled} \
     ${ENABLE_SIMD:+-Dhighway=enabled} ${ENABLE_SVG:+-Dresvg=enabled -Dresvg-module=enabled} \
     -Dppm=$PPM -Dnsgif=${ENABLE_GIF:-false} -Danalyze=$ANALYZE -Dradiance=$RADIANCE \
@@ -546,6 +567,7 @@ node --version
   stage "Compiling JS bindings"
   mkdir $DEPS/wasm-vips
   cd $DEPS/wasm-vips
+
   emcmake cmake $SOURCE_DIR -DCMAKE_BUILD_TYPE=Release -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$OUTPUT_DIR" \
     -DENVIRONMENT=${ENVIRONMENT//,/;} -DENABLE_MODULES=$MODULES -DENABLE_WASMFS=$WASM_FS -DENABLE_FS=$FS \
     -DSLIM_BUILD=${SLIM_BUILD}

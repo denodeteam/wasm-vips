@@ -41,7 +41,7 @@ declare module Vips {
 
     /**
      * Queue of handles to be deleted.
-     * This is filled when [[deleteLater]] is called on the handle.
+     * This is filled when {@link deleteLater} is called on the handle.
      */
     const deletionQueue: DeletionFuncs<Image | Connection | Interpolate>;
 
@@ -112,14 +112,6 @@ declare module Vips {
      */
     function shutdown(): void;
 
-    /**
-     * Convert a bigint value (usually coming from Wasm->JS call) into an int53 JS Number.
-     * This is used when we have an incoming i64 that we know is a pointer or size_t and
-     * is expected to be withing the int53 range.
-     * @return The converted bigint value or NaN if the incoming bigint is outside the range.
-     */
-    function bigintToI53Checked(num: bigint): number;
-
     //#endregion
 
     //#region APIs
@@ -129,8 +121,8 @@ declare module Vips {
      */
     abstract class EmbindClassHandle<T extends EmbindClassHandle<T>> {
         /**
-         * Returns a new handle. It must eventually also be disposed with [[delete]] or
-         * [[deleteLater]].
+         * Returns a new handle. It must eventually also be disposed with {@link delete} or
+         * {@link deleteLater}.
          * @return A new handle.
          */
         clone(): T;
@@ -317,7 +309,7 @@ declare module Vips {
          * ```js
          * const source = vips.Source.newFromFile('myfile.jpg');
          * ```
-         * You can pass this source to (for example) [[Image.newFromSource]].
+         * You can pass this source to (for example) {@link Image.newFromSource}.
          * @param filename The file.
          * @return A new source.
          */
@@ -331,7 +323,7 @@ declare module Vips {
          * const data = image.writeToBuffer('.jpg');
          * const source = vips.Source.newFromMemory(data);
          * ```
-         * You can pass this source to (for example) [[Image.newFromSource]].
+         * You can pass this source to (for example) {@link Image.newFromSource}.
          * @param memory The memory object.
          * @return A new source.
          */
@@ -344,11 +336,13 @@ declare module Vips {
     class SourceCustom extends Source {
         /**
          * Attach a read handler.
-         * @param ptr A pointer to an array of bytes where the read content is stored.
-         * @param size The maximum number of bytes to be read.
-         * @return The total number of bytes read into the buffer.
+         * The handler is given a number of bytes to fetch {@link length}, and should return a
+         * bytes-like object containing up to that number of bytes. If there's no more data
+         * available, it should return `undefined`.
+         * @param length The maximum number of bytes to be read.
+         * @return A blob up to {@link length} bytes or `undefined` if there's no more data available.
          */
-        onRead: (ptr: number, size: bigint) => bigint;
+        onRead: (length: number) => Blob | undefined;
 
         /**
          * Attach a seek handler.
@@ -358,7 +352,7 @@ declare module Vips {
          * @param size A value indicating the reference point used to obtain the new position.
          * @return The new position within the current source.
          */
-        onSeek: (offset: bigint, whence: number) => bigint;
+        onSeek: (offset: number, whence: number) => number;
     }
 
     /**
@@ -372,8 +366,8 @@ declare module Vips {
          * ```js
          * const target = vips.Target.newToFile('myfile.jpg');
          * ```
-         * You can pass this target to (for example) [[image.writeToTarget]].
-         * @param filename Write to this this file.
+         * You can pass this target to (for example) {@link image.writeToTarget}.
+         * @param filename Write to this file.
          * @return A new target.
          */
         static newToFile(filename: string): Target;
@@ -385,9 +379,9 @@ declare module Vips {
          * ```js
          * const target = vips.Target.newToMemory();
          * ```
-         * You can pass this target to (for example) [[image.writeToTarget]].
+         * You can pass this target to (for example) {@link image.writeToTarget}.
          *
-         * After writing to the target, fetch the bytes from the target object with [[getBlob]].
+         * After writing to the target, fetch the bytes from the target object with {@link getBlob}.
          * @return A new target.
          */
         static newToMemory(): Target;
@@ -407,22 +401,20 @@ declare module Vips {
     class TargetCustom extends Target {
         /**
          * Attach a write handler.
-         * @param ptr A pointer to an array of bytes which will be written to.
-         * @param length The number of bytes to write.
+         * @param data A typed array of 8-bit unsigned integer values.
          * @return The number of bytes that were written.
          */
-        onWrite: (ptr: number, size: bigint) => bigint;
+        onWrite: (data: Uint8Array) => number;
 
         /* libtiff needs to be able to seek and read on targets, unfortunately.
          */
 
         /**
          * Attach a read handler.
-         * @param ptr A pointer to an array of bytes where the read content is stored.
-         * @param size The maximum number of bytes to be read.
-         * @return The total number of bytes read from the target.
+         * @param length The maximum number of bytes to be read.
+         * @return A blob up to {@link length} bytes or `undefined` if there's no more data available.
          */
-        onRead: (ptr: number, size: bigint) => bigint;
+        onRead: (length: number) => Blob | undefined;
 
         /**
          * Attach a seek handler.
@@ -430,7 +422,7 @@ declare module Vips {
          * @param size A value indicating the reference point used to obtain the new position.
          * @return The new position within the current target.
          */
-        onSeek: (offset: bigint, whence: number) => bigint;
+        onSeek: (offset: number, whence: number) => number;
 
         /**
          * Attach an end handler.
@@ -550,7 +542,7 @@ declare module Vips {
          * Make a new temporary image.
          *
          * Returns an image backed by a temporary file. When written to with
-         * [[write]], a temporary file will be created on disc in the
+         * {@link write}, a temporary file will be created on disc in the
          * specified format. When the image is closed, the file will be deleted
          * automatically.
          *
@@ -605,7 +597,7 @@ declare module Vips {
             access?: Access | Enum
             /**
              * The type of error that will cause load to fail. By default,
-             * loaders are permissive, that is, [[FailOn.none]].
+             * loaders are permissive, that is, {@link FailOn.none}.
              */
             fail_on?: FailOn | Enum
             /**
@@ -630,8 +622,8 @@ declare module Vips {
          * This method is useful for efficiently transferring images from WebGL into
          * libvips.
          *
-         * See [[writeToMemory]] for the opposite operation.
-         * Use [[copy]] to set other image attributes.
+         * See {@link writeToMemory} for the opposite operation.
+         * Use {@link copy} to set other image attributes.
          * @param data A C-style JavaScript array.
          * @param width Image width in pixels.
          * @param height Image height in pixels.
@@ -644,7 +636,7 @@ declare module Vips {
         /**
          * Wrap an image around a pointer.
          *
-         * This behaves exactly as [[newFromMemory]], but the image is
+         * This behaves exactly as {@link newFromMemory}, but the image is
          * loaded from a pointer rather than from a JavaScript array.
          * @param ptr A memory address.
          * @param size Length of memory area.
@@ -659,7 +651,7 @@ declare module Vips {
         /**
          * Load a formatted image from memory.
          *
-         * This behaves exactly as [[newFromFile]], but the image is
+         * This behaves exactly as {@link newFromFile}, but the image is
          * loaded from the memory object rather than from a file. The
          * memory object can be a string or buffer.
          * @param data The memory object to load the image from.
@@ -674,7 +666,7 @@ declare module Vips {
             access?: Access | Enum
             /**
              * The type of error that will cause load to fail. By default,
-             * loaders are permissive, that is, [[FailOn.none]].
+             * loaders are permissive, that is, {@link FailOn.none}.
              */
             fail_on?: FailOn | Enum
             /**
@@ -686,7 +678,7 @@ declare module Vips {
         /**
          * Load a formatted image from a source.
          *
-         * This behaves exactly as [[newFromFile]], but the image is
+         * This behaves exactly as {@link newFromFile}, but the image is
          * loaded from a source rather than from a file.
          * @param source The source to load the image from.
          * @param strOptions Load options as a string.
@@ -700,7 +692,7 @@ declare module Vips {
             access?: Access | Enum
             /**
              * The type of error that will cause load to fail. By default,
-             * loaders are permissive, that is, [[FailOn.none]].
+             * loaders are permissive, that is, {@link FailOn.none}.
              */
             fail_on?: FailOn | Enum
             /**
@@ -712,9 +704,9 @@ declare module Vips {
         /**
          * Create an image from a 1D array.
          *
-         * A new one-band image with [[BandFormat.double]] pixels is
+         * A new one-band image with {@link BandFormat.double} pixels is
          * created from the array. These images are useful with the libvips
-         * convolution operator [[conv]].
+         * convolution operator {@link conv}.
          * @param width Image width.
          * @param height Image height.
          * @param array Create the image from these values.
@@ -725,9 +717,9 @@ declare module Vips {
         /**
          * Create an image from a 2D array.
          *
-         * A new one-band image with [[BandFormat.double]] pixels is
+         * A new one-band image with {@link BandFormat.double} pixels is
          * created from the array. These images are useful with the libvips
-         * convolution operator [[conv]].
+         * convolution operator {@link conv}.
          * @param array Create the image from these values.
          * @param scale Default to 1.0. What to divide each pixel by after
          * convolution. Useful for integer convolution masks.
@@ -766,7 +758,7 @@ declare module Vips {
          * Write an image to another image.
          *
          * This function writes itself to another image. Use something like
-         * [[newTempFile]] to make an image that can be written to.
+         * {@link newTempFile} to make an image that can be written to.
          * @param other The image to write to.
          * @return A new image.
          */
@@ -777,7 +769,7 @@ declare module Vips {
          *
          * This method can save images in any format supported by libvips. The format
          * is selected from the filename suffix. The filename can include embedded
-         * save options, see [[newFromFile]].
+         * save options, see {@link newFromFile}.
          *
          * For example:
          * ```js
@@ -806,7 +798,7 @@ declare module Vips {
          *
          * This method can save images in any format supported by libvips. The format
          * is selected from the suffix in the format string. This can include
-         * embedded save options, see [[newFromFile]].
+         * embedded save options, see {@link newFromFile}.
          *
          * For example:
          * ```js
@@ -834,7 +826,7 @@ declare module Vips {
         /**
          * Write an image to a target.
          *
-         * This behaves exactly as [[writeToFile]], but the image is
+         * This behaves exactly as {@link writeToFile}, but the image is
          * written to a target rather than a file.
          * @param target Write to this target.
          * @param formatString The suffix, plus any string-form arguments.
@@ -879,28 +871,28 @@ declare module Vips {
         setArrayInt(name: string, value: ArrayConstant): void;
 
         /**
-         * Set an double array on an image as metadata.
+         * Set a double array on an image as metadata.
          * @param name The name of the piece of metadata to set the value of.
          * @param value The metadata value.
          */
         setArrayDouble(name: string, value: ArrayConstant): void;
 
         /**
-         * Set an double on an image as metadata.
+         * Set a double on an image as metadata.
          * @param name The name of the piece of metadata to set the value of.
          * @param value The metadata value.
          */
         setDouble(name: string, value: number): void;
 
         /**
-         * Set an string on an image as metadata.
+         * Set a string on an image as metadata.
          * @param name The name of the piece of metadata to set the value of.
          * @param value The metadata value.
          */
         setString(name: string, value: string): void;
 
         /**
-         * Set an blob on an image as metadata.
+         * Set a blob on an image as metadata.
          * The value will internally be copied from JavaScript to WASM.
          * @param name The name of the piece of metadata to set the value of.
          * @param value The metadata value.
@@ -908,7 +900,7 @@ declare module Vips {
         setBlob(name: string, value: Blob): void;
 
         /**
-         * Set an blob pointer on an image as metadata.
+         * Set a blob pointer on an image as metadata.
          * @param name The name of the piece of metadata to set the value of.
          * @param ptr The metadata value as memory address.
          * @param size Length of blob.
@@ -938,30 +930,30 @@ declare module Vips {
         getArrayInt(name: string): number[];
 
         /**
-         * Get an double array from an image.
+         * Get a double array from an image.
          * @param name The name of the piece of metadata to get.
-         * @return The metadata item as an double array.
+         * @return The metadata item as a double array.
          */
         getArrayDouble(name: string): number[];
 
         /**
          * Get an double from an image.
          * @param name The name of the piece of metadata to get.
-         * @return The metadata item as an double.
+         * @return The metadata item as a double.
          */
         getDouble(name: string): number;
 
         /**
-         * Get an string from an image.
+         * Get a string from an image.
          * @param name The name of the piece of metadata to get.
-         * @return The metadata item as an string.
+         * @return The metadata item as a string.
          */
         getString(name: string): string;
 
         /**
-         * Get an blob from an image.
+         * Get a blob from an image.
          * @param name The name of the piece of metadata to get.
-         * @return The metadata item as an typed array of 8-bit unsigned integer values.
+         * @return The metadata item as a typed array of 8-bit unsigned integer values.
          */
         getBlob(name: string): Uint8Array;
 
@@ -976,7 +968,7 @@ declare module Vips {
          * @param name The name of the piece of metadata to remove.
          * @return `true` if successfully removed.
          */
-        remove(name: string): string;
+        remove(name: string): boolean;
 
         //#endregion
 
@@ -991,7 +983,7 @@ declare module Vips {
         /**
          * Sets the `delete_on_close` flag for the image.
          * If this flag is set, when image is finalized, the filename held in
-         * [[image.filename]] at the time of this call is deleted.
+         * {@link image.filename} at the time of this call is deleted.
          * This function is clearly extremely dangerous, use with great caution.
          */
         setDeleteOnClose(flag: boolean): void;

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(wasm-vips
-        VERSION 0.0.9
+        VERSION 0.0.11
         DESCRIPTION "libvips for the browser and Node.js, compiled to WebAssembly with Emscripten"
         LANGUAGES
             CXX
@@ -29,6 +29,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Find libvips (required)
 find_package(PkgConfig)
-pkg_check_modules(VIPS vips>=8.15 REQUIRED)
+pkg_check_modules(VIPS vips>=8.16 REQUIRED)
 
 add_subdirectory(src)

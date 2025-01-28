@@ -4,9 +4,38 @@ All notable changes to wasm-vips will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.0.10] - TBD
+## [v0.0.12] - TBD
 
-Uses libvips v8.15.2, compiled with Emscripten v3.1.63.
+Uses libvips v8.16.0, compiled with Emscripten v4.0.1.
+
+### Fixed
+
+- Prevent use of the `/tmp` directory for Node.js on Windows.
+  [#84](https://github.com/kleisauke/wasm-vips/issues/84)
+
+## [v0.0.11] - 2024-10-31
+
+Uses libvips v8.16.0, compiled with Emscripten v3.1.70.
+
+### Changed
+
+- Avoid pointer arguments in `SourceCustom.onRead` and
+  `TargetCustom.onWrite` callbacks.
+  [#74](https://github.com/kleisauke/wasm-vips/issues/74)
+- Update methods/enums for libvips 8.16.
+
+### Fixed
+
+- Fix Deno compatibility (regression in 0.0.9).
+  [#81](https://github.com/kleisauke/wasm-vips/issues/81)
+
+### Removed
+
+- Remove redundant `vips.bigintToI53Checked()` helper.
+
+## [v0.0.10] - 2024-08-14
+
+Uses libvips v8.15.3, compiled with Emscripten v3.1.64.
 
 ### Added
 
@@ -14,6 +43,13 @@ Uses libvips v8.15.2, compiled with Emscripten v3.1.63.
   automatically deleted when `setAutoDeleteLater(true)` is used.
   [#70](https://github.com/kleisauke/wasm-vips/pull/70)
   [@marcosc90](https://github.com/marcosc90)
+- Add `*.wasm` files to the `exports` section of `package.json`.
+
+### Changed
+
+- Reduce concurrency by default to 1 on the web.
+  [#69](https://github.com/kleisauke/wasm-vips/issues/69)
+  [#71](https://github.com/kleisauke/wasm-vips/issues/71)
 
 ## [v0.0.9] - 2024-06-01
 
@@ -178,6 +214,8 @@ Uses libvips v8.10.0, compiled with Emscripten v2.0.0.
 
 - Initial release.
 
+[v0.0.12]: https://github.com/kleisauke/wasm-vips/compare/v0.0.11...v0.0.12
+[v0.0.11]: https://github.com/kleisauke/wasm-vips/compare/v0.0.10...v0.0.11
 [v0.0.10]: https://github.com/kleisauke/wasm-vips/compare/v0.0.9...v0.0.10
 [v0.0.9]: https://github.com/kleisauke/wasm-vips/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/kleisauke/wasm-vips/compare/v0.0.7...v0.0.8

@@ -1,6 +1,6 @@
 {
   "name": "wasm-vips-test",
-  "version": "0.0.9",
+  "version": "0.0.11",
   "private": true,
   "description": "Unit tests for wasm-vips",
   "homepage": "https://github.com/kleisauke/wasm-vips/tree/master/test/unit",
@@ -19,8 +19,8 @@
     "test": "mocha -s 5000 -t 120000 *.js -r node-helper.js --variant=$VARIANT"
   },
   "devDependencies": {
-    "chai": "^5.1.1",
-    "mocha": "^10.7.0"
+    "chai": "^5.1.2",
+    "mocha": "^11.0.1"
   },
   "engines": {
     "node": ">=16.4.0"
